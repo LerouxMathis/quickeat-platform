@@ -1,0 +1,105 @@
+version: "3.9"
+
+services:
+  restaurant-service:
+    build: ./services/restaurant-service
+    container_name: restaurant-service
+    environment:
+      - PORT=3001
+      - SERVICE_NAME=restaurant-service
+      - LOG_LEVEL=info
+    networks:
+      - quickeat-network
+    ports:
+      - "3001:3001"
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:3001/health"]
+      interval: 10s
+      retries: 3
+
+  menu-service:
+    build: ./services/menu-service
+    container_name: menu-service
+    environment:
+      - PORT=3002
+      - SERVICE_NAME=menu-service
+      - LOG_LEVEL=info
+      - RESTAURANT_SERVICE_URL=http://restaurant-service:3001
+    networks:
+      - quickeat-network
+    ports:
+      - "3002:3002"
+    depends_on:
+      - restaurant-service
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:3002/health"]
+      interval: 10s
+      retries: 3
+
+  order-service:
+    build: ./services/order-service
+    container_name: order-service
+    environment:
+      - PORT=3003
+      - SERVICE_NAME=order-service
+      - LOG_LEVEL=info
+      - RESTAURANT_SERVICE_URL=http://restaurant-service:3001
+      - MENU_SERVICE_URL=http://menu-service:3002
+      - NOTIFICATION_SERVICE_URL=http://notification-service:3004
+    networks:
+      - quickeat-network
+    ports:
+      - "3003:3003"
+    depends_on:
+      - restaurant-service
+      - menu-service
+      - notification-service
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:3003/health"]
+      interval: 10s
+      retries: 3
+
+  notification-service:
+    build: ./services/notification-service
+    container_name: notification-service
+    environment:
+      - PORT=3004
+      - SERVICE_NAME=notification-service
+      - LOG_LEVEL=info
+    networks:
+      - quickeat-network
+    ports:
+      - "3004:3004"
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:3004/health"]
+      interval: 10s
+      retries: 3
+
+  gateway:
+    build: ./gateway
+    container_name: api-gateway
+    environment:
+      - PORT=4000
+      - LOG_LEVEL=info
+      - JWT_SECRET=changeme
+      - RESTAURANT_SERVICE_URL=http://restaurant-service:3001
+      - MENU_SERVICE_URL=http://menu-service:3002
+      - ORDER_SERVICE_URL=http://order-service:3003
+      - NOTIFICATION_SERVICE_URL=http://notification-service:3004
+    networks:
+      - quickeat-network
+    ports:
+      - "4000:4000"
+    depends_on:
+      - restaurant-service
+      - menu-service
+      - order-service
+      - notification-service
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:4000/health"]
+      interval: 10s
+      retries: 3
+
+networks:
+  quickeat-network:
+    external: true
